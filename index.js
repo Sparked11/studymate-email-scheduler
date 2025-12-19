@@ -268,12 +268,15 @@ async function sendDailyEmails() {
       // Get user stats
       const stats = await getUserStats(doc.id);
       
+      // Get topics (support both field names for compatibility)
+      const topics = schedule.selectedTopics || schedule.interestedTopics || [];
+      
       // Send email
       const success = await sendEmail(
         schedule.email,
-        schedule.name || 'Student',
+        schedule.userName || schedule.name || 'Student',
         stats,
-        schedule.selectedTopics || []
+        topics
       );
 
       if (success) {
