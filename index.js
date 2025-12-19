@@ -303,18 +303,54 @@ async function sendDailyEmails() {
   }
 }
 
-// Export for different platforms
-module.exports = { sendDailyEmails };
+// Create HTTP server for Render
+const http = require('http');
 
-// Run if called directly
-if (require.main === module) {
-  sendDailyEmails()
-    .then(result => {
-      console.log('\n✅ Done!', result);
-      process.exit(0);
-    })
-    .catch(error => {
-      console.error('\n❌ Fatal error:', error);
-      process.exit(1);
-    });
-}
+const server = http.createServer(async (req, res) => {
+  // Health check endpoint
+  if (req.url === '/health' || req.url === '/') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      status: 'ok', 
+      service: 'StudyMate.AI Email Scheduler',
+      timestamp: new Date().toISOString()
+    }));
+    return;
+  }
+  
+  // Trigger email sending
+  if (req.url === '/send' || req.url === '/trigger') {
+    console.log('📧 Email send triggered via HTTP request');
+    
+    try {
+      const result = await sendDailyEmails();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        success: false, 
+        error: error.message 
+      }));
+    }
+    return;
+  }
+  
+  // 404 for unknown routes
+  res.writeHead(404, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ 
+    error: 'Not found',
+    availableEndpoints: ['/health', '/send', '/trigger']
+  }));
+});
+
+const PORT = process.env.PORT || 10000;
+
+server.listen(PORT, () => {
+  console.log(`🚀 Email scheduler server running on port ${PORT}`);
+  console.log(`📧 Trigger emails by visiting: http://localhost:${PORT}/send`);
+  console.log(`💚 Health check: http://localhost:${PORT}/health`);
+});
+
+// Export for testing
+module.exports = { sendDailyEmails };
