@@ -325,10 +325,22 @@ const server = http.createServer(async (req, res) => {
   if (req.url === '/send' || req.url === '/trigger') {
     console.log('📧 Email send triggered via HTTP request');
     
+    // Suppress detailed logs for cron jobs (they have output limits)
+    const isCronJob = req.headers['user-agent']?.includes('cron-job.org') || false;
+    
     try {
       const result = await sendDailyEmails();
+      
+      // Return minimal response
+      const response = {
+        success: result.success,
+        sent: result.sent,
+        failed: result.failed,
+        timestamp: new Date().toISOString()
+      };
+      
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(result));
+      res.end(JSON.stringify(response));
     } catch (error) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
