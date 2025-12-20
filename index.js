@@ -334,18 +334,25 @@ const server = http.createServer(async (req, res) => {
       // Return minimal response
       const response = {
         success: result.success,
-        sent: result.sent,
-        failed: result.failed,
+        sent: result.sent || 0,
+        failed: result.failed || 0,
         timestamp: new Date().toISOString()
       };
+      
+      // If sendDailyEmails returned an error, include it
+      if (result.error) {
+        response.error = result.error;
+      }
       
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(response));
     } catch (error) {
+      console.error('❌ HTTP handler error:', error);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         success: false, 
-        error: error.message 
+        error: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       }));
     }
     return;
