@@ -238,11 +238,52 @@ async function sendEmail(toEmail, toName, stats, selectedTopics) {
 }
 
 /**
+ * Check if it's time to send email to a user based on their preferred time
+ */
+function shouldSendEmail(schedule) {
+  const now = new Date();
+  const currentHour = now.getUTCHours(); // Use UTC for consistency
+  
+  // Get user's preferred time (format: "HH:mm" like "15:00")
+  const preferredTime = schedule.preferredTime;
+  
+  if (!preferredTime) {
+    // No preferred time set, send every time (backward compatibility)
+    return true;
+  }
+  
+  // Parse preferred hour from "HH:mm" format
+  const preferredHour = parseInt(preferredTime.split(':')[0], 10);
+  
+  // Check if we're in the user's preferred hour
+  // Allow a 1-hour window to account for timing variations
+  if (currentHour === preferredHour || currentHour === preferredHour - 1) {
+    return true;
+  }
+  
+  // Check if email was already sent today
+  if (schedule.lastEmailSent) {
+    const lastSent = schedule.lastEmailSent.toDate();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (lastSent >= today) {
+      // Already sent today, skip
+      return false;
+    }
+  }
+  
+  return false;
+}
+
+/**
  * Main function to send daily emails
  */
 async function sendDailyEmails() {
   console.log('🚀 Starting daily email send...');
-  console.log(`⏰ Time: ${new Date().toISOString()}`);
+  const now = new Date();
+  console.log(`⏰ Time: ${now.toISOString()}`);
+  console.log(`⏰ UTC Hour: ${now.getUTCHours()}:00`);
   
   try {
     // Get all email schedules
@@ -255,6 +296,7 @@ async function sendDailyEmails() {
 
     let sent = 0;
     let failed = 0;
+    let skipped = 0;
 
     for (const doc of schedulesSnapshot.docs) {
       const schedule = doc.data();
@@ -262,8 +304,18 @@ async function sendDailyEmails() {
       // Check if email is enabled
       if (!schedule.emailEnabled) {
         console.log(`⏭️  Skipping ${schedule.email} - emails disabled`);
+        skipped++;
         continue;
       }
+
+      // Check if it's the right time for this user
+      if (!shouldSendEmail(schedule)) {
+        console.log(`⏰ Skipping ${schedule.email} - not scheduled for this hour (preferred: ${schedule.preferredTime || 'not set'})`);
+        skipped++;
+        continue;
+      }
+
+      console.log(`📧 Sending to ${schedule.email} (preferred time: ${schedule.preferredTime || 'any time'})`);
 
       // Get user stats
       const stats = await getUserStats(doc.id);
@@ -297,9 +349,10 @@ async function sendDailyEmails() {
     console.log(`\n📊 Summary:`);
     console.log(`✅ Sent: ${sent}`);
     console.log(`❌ Failed: ${failed}`);
-    console.log(`📝 Total processed: ${sent + failed}`);
+    console.log(`⏭️  Skipped: ${skipped}`);
+    console.log(`📝 Total processed: ${sent + failed + skipped}`);
 
-    return { success: true, sent, failed };
+    return { success: true, sent, failed, skipped };
   } catch (error) {
     console.error('❌ Error sending daily emails:', error);
     return { success: false, error: error.message };
@@ -336,6 +389,7 @@ const server = http.createServer(async (req, res) => {
         success: result.success,
         sent: result.sent || 0,
         failed: result.failed || 0,
+        skipped: result.skipped || 0,
         timestamp: new Date().toISOString()
       };
       
