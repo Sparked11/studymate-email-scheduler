@@ -278,20 +278,23 @@ function shouldSendEmail(schedule) {
 
 /**
  * Main function to send daily emails
+ * @param {boolean} quietMode - If true, suppress detailed console logs
  */
-async function sendDailyEmails() {
-  console.log('🚀 Starting daily email send...');
-  const now = new Date();
-  console.log(`⏰ Time: ${now.toISOString()}`);
-  console.log(`⏰ UTC Hour: ${now.getUTCHours()}:00`);
+async function sendDailyEmails(quietMode = false) {
+  if (!quietMode) {
+    console.log('🚀 Starting daily email send...');
+    const now = new Date();
+    console.log(`⏰ Time: ${now.toISOString()}`);
+    console.log(`⏰ UTC Hour: ${now.getUTCHours()}:00`);
+  }
   
   try {
     // Get all email schedules
     const schedulesSnapshot = await db.collection('email_schedules').get();
     
     if (schedulesSnapshot.empty) {
-      console.log('📭 No email schedules found');
-      return { success: true, sent: 0, failed: 0 };
+      if (!quietMode) console.log('📭 No email schedules found');
+      return { success: true, sent: 0, failed: 0, skipped: 0 };
     }
 
     let sent = 0;
@@ -303,19 +306,19 @@ async function sendDailyEmails() {
       
       // Check if email is enabled
       if (!schedule.emailEnabled) {
-        console.log(`⏭️  Skipping ${schedule.email} - emails disabled`);
+        if (!quietMode) console.log(`⏭️  Skipping ${schedule.email} - emails disabled`);
         skipped++;
         continue;
       }
 
       // Check if it's the right time for this user
       if (!shouldSendEmail(schedule)) {
-        console.log(`⏰ Skipping ${schedule.email} - not scheduled for this hour (preferred: ${schedule.preferredTime || 'not set'})`);
+        if (!quietMode) console.log(`⏰ Skipping ${schedule.email} - not scheduled for this hour (preferred: ${schedule.preferredTime || 'not set'})`);
         skipped++;
         continue;
       }
 
-      console.log(`📧 Sending to ${schedule.email} (preferred time: ${schedule.preferredTime || 'any time'})`);
+      if (!quietMode) console.log(`📧 Sending to ${schedule.email} (preferred time: ${schedule.preferredTime || 'any time'})`);
 
       // Get user stats
       const stats = await getUserStats(doc.id);
@@ -346,11 +349,13 @@ async function sendDailyEmails() {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    console.log(`\n📊 Summary:`);
-    console.log(`✅ Sent: ${sent}`);
-    console.log(`❌ Failed: ${failed}`);
-    console.log(`⏭️  Skipped: ${skipped}`);
-    console.log(`📝 Total processed: ${sent + failed + skipped}`);
+    if (!quietMode) {
+      console.log(`\n📊 Summary:`);
+      console.log(`✅ Sent: ${sent}`);
+      console.log(`❌ Failed: ${failed}`);
+      console.log(`⏭️  Skipped: ${skipped}`);
+      console.log(`📝 Total processed: ${sent + failed + skipped}`);
+    }
 
     return { success: true, sent, failed, skipped };
   } catch (error) {
@@ -376,13 +381,15 @@ const server = http.createServer(async (req, res) => {
   
   // Trigger email sending
   if (req.url === '/send' || req.url === '/trigger') {
-    console.log('📧 Email send triggered via HTTP request');
-    
     // Suppress detailed logs for cron jobs (they have output limits)
     const isCronJob = req.headers['user-agent']?.includes('cron-job.org') || false;
     
+    if (!isCronJob) {
+      console.log('📧 Email send triggered via HTTP request');
+    }
+    
     try {
-      const result = await sendDailyEmails();
+      const result = await sendDailyEmails(isCronJob);
       
       // Return minimal response
       const response = {
