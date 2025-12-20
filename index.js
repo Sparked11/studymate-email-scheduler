@@ -198,7 +198,7 @@ function buildEmailHTML(name, stats, selectedTopics) {
 /**
  * Send email via SendGrid
  */
-async function sendEmail(toEmail, toName, stats, selectedTopics) {
+async function sendEmail(toEmail, toName, stats, selectedTopics, quietMode = false) {
   const emailBody = {
     personalizations: [{
       to: [{ email: toEmail, name: toName }],
@@ -228,11 +228,15 @@ async function sendEmail(toEmail, toName, stats, selectedTopics) {
   });
 
   if (response.status === 202) {
-    console.log(`✅ Email sent to ${toEmail}`);
+    if (!quietMode) {
+      console.log(`✅ Email sent to ${toEmail}`);
+    }
     return true;
   } else {
     const error = await response.text();
-    console.error(`❌ Failed to send email to ${toEmail}:`, error);
+    if (!quietMode) {
+      console.error(`❌ Failed to send email to ${toEmail}:`, error);
+    }
     return false;
   }
 }
@@ -331,7 +335,8 @@ async function sendDailyEmails(quietMode = false) {
         schedule.email,
         schedule.userName || schedule.name || 'Student',
         stats,
-        topics
+        topics,
+        quietMode
       );
 
       if (success) {
@@ -359,7 +364,9 @@ async function sendDailyEmails(quietMode = false) {
 
     return { success: true, sent, failed, skipped };
   } catch (error) {
-    console.error('❌ Error sending daily emails:', error);
+    if (!quietMode) {
+      console.error('❌ Error sending daily emails:', error);
+    }
     return { success: false, error: error.message };
   }
 }
@@ -408,7 +415,9 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(response));
     } catch (error) {
-      console.error('❌ HTTP handler error:', error);
+      if (!isCronJob) {
+        console.error('❌ HTTP handler error:', error);
+      }
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         success: false, 
