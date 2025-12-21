@@ -248,24 +248,7 @@ function shouldSendEmail(schedule) {
   const now = new Date();
   const currentHour = now.getUTCHours(); // Use UTC for consistency
   
-  // Get user's preferred time (format: "HH:mm" like "15:00")
-  const preferredTime = schedule.preferredTime;
-  
-  if (!preferredTime) {
-    // No preferred time set, send every time (backward compatibility)
-    return true;
-  }
-  
-  // Parse preferred hour from "HH:mm" format
-  const preferredHour = parseInt(preferredTime.split(':')[0], 10);
-  
-  // Check if we're in the user's preferred hour
-  // Allow a 1-hour window to account for timing variations
-  if (currentHour === preferredHour || currentHour === preferredHour - 1) {
-    return true;
-  }
-  
-  // Check if email was already sent today
+  // Check if email was already sent today first
   if (schedule.lastEmailSent) {
     const lastSent = schedule.lastEmailSent.toDate();
     const today = new Date();
@@ -277,6 +260,23 @@ function shouldSendEmail(schedule) {
     }
   }
   
+  // Get user's preferred time (format: "HH:mm" like "15:00")
+  const preferredTime = schedule.preferredTime;
+  
+  if (!preferredTime) {
+    // No preferred time set, send now (backward compatibility)
+    return true;
+  }
+  
+  // Parse preferred hour from "HH:mm" format
+  const preferredHour = parseInt(preferredTime.split(':')[0], 10);
+  
+  // Check if we're in the user's preferred hour
+  if (currentHour === preferredHour) {
+    return true;
+  }
+  
+  // Not the right time yet
   return false;
 }
 
