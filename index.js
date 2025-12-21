@@ -386,6 +386,24 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   
+  // Ultra-silent cron endpoint - returns HTTP 204 (No Content)
+  // Use this for cron-job.org to avoid "output too large" errors
+  if (req.url === '/cron') {
+    try {
+      // Fire and forget - don't wait for completion
+      sendDailyEmails(true).catch(() => {});
+      
+      // Return immediately with NO content (zero bytes)
+      res.writeHead(204); // 204 = No Content
+      res.end();
+    } catch {
+      // Even on error, return 204
+      res.writeHead(204);
+      res.end();
+    }
+    return;
+  }
+  
   // Trigger email sending
   if (req.url === '/send' || req.url === '/trigger') {
     // Suppress detailed logs for cron jobs (they have output limits)
