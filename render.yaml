@@ -1,0 +1,35 @@
+services:
+  # Web service for health checks
+  - type: web
+    name: studymate-email-scheduler
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false
+
+  # Cron job to trigger emails hourly
+  - type: cron
+    name: studymate-email-cron
+    env: node
+    plan: free
+    schedule: "0 * * * *"  # Every hour at minute 0
+    buildCommand: npm install
+    startCommand: node -e "const {sendDailyEmails} = require('./index.js'); sendDailyEmails(true).then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false
