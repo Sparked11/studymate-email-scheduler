@@ -398,7 +398,14 @@ const server = http.createServer(async (req, res) => {
     try {
       const result = await sendDailyEmails(isCronJob);
       
-      // Return minimal response
+      // For cron jobs, return ULTRA minimal response
+      if (isCronJob) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: 1, s: result.sent || 0 }));
+        return;
+      }
+      
+      // For manual requests, return full response
       const response = {
         success: result.success,
         sent: result.sent || 0,
